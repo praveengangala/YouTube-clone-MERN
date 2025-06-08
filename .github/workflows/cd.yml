@@ -1,7 +1,9 @@
 name: CD
 
 on:
-  workflow_dispatch:  # Allows manual trigger from GitHub UI
+  push:
+    branches:
+      - main
 
 jobs:
   deploy:
@@ -22,16 +24,22 @@ jobs:
       run: |
         aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
 
-    - name: Ensure toas-int namespace exists
+    - name: Ensure Namespace Exists
       run: |
         kubectl create namespace toas --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Update Docker image in deployment.yaml
+    - name: Deploy Backend to EKS
       run: |
-        sed -i 's|image:.*|image: praveengangala/youtube-mrn:latest|' k8s/deployment.yaml
+        kubectl apply -n toas -f k8s/backend-deployment.yaml
+        kubectl apply -n toas -f k8s/backend-service.yaml
 
-    - name: Deploy to EKS - toas-int namespace
+    - name: Deploy Frontend to EKS
       run: |
-        kubectl apply -n toas-int -f k8s/deployment.yaml
-        kubectl apply -n toas-int -f k8s/service.yaml
-        echo "🔄 Waiting for rollout to complete"
+        kubectl apply -n toas -f k8s/frontend-deployment.yaml
+        kubectl apply -n toas -f k8s/frontend-service.yaml
+
+    - name: Verify Deployments
+      run: |
+        kubectl rollout status deployment/frontend-app -n toas
+        kubectl rollout status deployment/backend-app -n toas
+        kubectl get all -n toas -o wide
