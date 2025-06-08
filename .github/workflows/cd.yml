@@ -1,9 +1,7 @@
 name: CD
 
 on:
-  push:
-    branches:
-      - main  # Trigger when code is pushed to main
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
 
 jobs:
   deploy:
@@ -36,9 +34,4 @@ jobs:
       run: |
         kubectl apply -n toas-int -f k8s/deployment.yaml
         kubectl apply -n toas-int -f k8s/service.yaml
-
         echo "🔄 Waiting for rollout to complete"
-        kubectl rollout status deployment/nodejs-app -n toas-int
-
-        echo "📋 Current resources in toas-int:"
-        kubectl get all -n toas-int -o wide
