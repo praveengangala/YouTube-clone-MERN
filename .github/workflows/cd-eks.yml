@@ -1,0 +1,43 @@
+name: CD
+
+on:
+  workflow_dispatch:  # 👈 Manual trigger via GitHub Actions UI
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Update kubeconfig for EKS
+      run: |
+        aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
+
+    - name: Ensure Namespace Exists
+      run: |
+        kubectl create namespace toas --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Deploy Backend to EKS
+      run: |
+        kubectl apply -n toas -f k8s/backend-deployment.yaml
+        kubectl apply -n toas -f k8s/backend-service.yaml
+
+    - name: Deploy Frontend to EKS
+      run: |
+        kubectl apply -n toas -f k8s/frontend-deployment.yaml
+        kubectl apply -n toas -f k8s/frontend-service.yaml
+
+    - name: Verify Deployments
+      run: |
+        kubectl rollout status deployment/frontend-app -n toas
+        kubectl rollout status deployment/backend-app -n toas
+        kubectl get all -n toas -o wide
